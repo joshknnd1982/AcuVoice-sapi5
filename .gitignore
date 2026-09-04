@@ -1,0 +1,10 @@
+build/
+build_x86/
+build_x64/
+build_probe/
+output/
+
+# The AcuVoice engine itself is not redistributable source. avcore.dll, the 154 MB
+# recorded sound bank, the dictionary and the dictionary editor are (c) 1998-1999
+# AcuVoice, Inc. / Fonix Corporation; they ship only in the release installer.
+/engine/

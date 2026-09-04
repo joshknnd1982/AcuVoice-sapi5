@@ -1,0 +1,107 @@
+#include <windows.h>
+#include <commctrl.h>
+#include "acuvoice_config_res.h"
+
+// Every control has a static label immediately before it in the dialog's own control
+// order. That order is what MSAA uses to name a control, so a screen reader reading a
+// slider says what the slider is for. Every control is a tab stop, every one has an Alt
+// shortcut of its own -- no two share a letter -- and nothing here needs the mouse.
+//
+// The sliders all run 0 to 100 and mean the same thing everywhere: 0 is the least the
+// engine will do and 100 is the most. That also keeps what a screen reader announces
+// honest -- MSAA reports a trackbar as a percentage of its range, which for a 0..100
+// range is the number on the slider.
+//
+// The window is taller than the work area of a 1366x768 laptop, so it carries WS_VSCROLL
+// and the code scrolls it -- including scrolling whatever has keyboard focus back into
+// view, so nothing here can end up unreachable on a short screen.
+
+IDD_CONFIG DIALOGEX 0, 0, 380, 462
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU |
+      WS_MINIMIZEBOX | WS_VSCROLL
+CAPTION "AcuVoice Speech Configuration"
+FONT 9, "Segoe UI", 400, 0, 1
+BEGIN
+    GROUPBOX        "AcuVoice Custom Voice", -1, 7, 4, 366, 108
+
+    LTEXT           "Speaking &rate (0 = the engine's slowest, 85 words a minute; 100 = its fastest, 350)",
+                    IDC_RATE_LABEL, 14, 14, 352, 8
+    CONTROL         "", IDC_RATE, TRACKBAR_CLASS,
+                    TBS_AUTOTICKS | TBS_TOOLTIPS | WS_TABSTOP, 14, 23, 352, 15
+
+    LTEXT           "&Pitch (0 = six semitones below the recorded voice; 50 = the voice itself; 100 = six above)",
+                    IDC_PITCH_LABEL, 14, 41, 352, 8
+    CONTROL         "", IDC_PITCH, TRACKBAR_CLASS,
+                    TBS_AUTOTICKS | TBS_TOOLTIPS | WS_TABSTOP, 14, 50, 352, 15
+
+    LTEXT           "&Volume (0 = silent; 50 = the recorded level; 100 = twice as loud)",
+                    IDC_VOLUME_LABEL, 14, 68, 352, 8
+    CONTROL         "", IDC_VOLUME, TRACKBAR_CLASS,
+                    TBS_AUTOTICKS | TBS_TOOLTIPS | WS_TABSTOP, 14, 77, 352, 15
+
+    LTEXT           "Start &from a ready-made voice:", IDC_COPYFROM_LABEL, 14, 96, 150, 8
+    COMBOBOX        IDC_COPYFROM, 168, 94, 120, 160,
+                    CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Copy its settings", IDC_COPYFROM_APPLY, 292, 94, 74, 13
+
+    GROUPBOX        "Silence the engine inserts", -1, 7, 116, 366, 119
+
+    LTEXT           "Pause &after a sentence (0 = none, 100 = 3 seconds; the engine ships with 650 ms)",
+                    IDC_PAUSE1_LABEL, 14, 126, 352, 8
+    CONTROL         "", IDC_PAUSE1, TRACKBAR_CLASS,
+                    TBS_AUTOTICKS | TBS_TOOLTIPS | WS_TABSTOP, 14, 135, 352, 15
+
+    LTEXT           "Pause at a se&micolon or colon (0 = none, 100 = 3 seconds; ships with 500 ms)",
+                    IDC_PAUSE2_LABEL, 14, 153, 352, 8
+    CONTROL         "", IDC_PAUSE2, TRACKBAR_CLASS,
+                    TBS_AUTOTICKS | TBS_TOOLTIPS | WS_TABSTOP, 14, 162, 352, 15
+
+    LTEXT           "Pause at a c&omma (0 = none, 100 = 3 seconds; ships with 350 ms)",
+                    IDC_PAUSE3_LABEL, 14, 180, 352, 8
+    CONTROL         "", IDC_PAUSE3, TRACKBAR_CLASS,
+                    TBS_AUTOTICKS | TBS_TOOLTIPS | WS_TABSTOP, 14, 189, 352, 15
+
+    LTEXT           "&Gap between words (0 = none, 100 = 100 milliseconds; ships with 7 ms)",
+                    IDC_PAUSE4_LABEL, 14, 207, 352, 8
+    CONTROL         "", IDC_PAUSE4, TRACKBAR_CLASS,
+                    TBS_AUTOTICKS | TBS_TOOLTIPS | WS_TABSTOP, 14, 216, 352, 15
+
+    GROUPBOX        "Applies to every AcuVoice voice", -1, 7, 239, 366, 111
+
+    LTEXT           "&Extra rate for every voice (0 = quarter speed, 50 = unchanged, 100 = four times)",
+                    IDC_GRATE_LABEL, 14, 249, 352, 8
+    CONTROL         "", IDC_GRATE, TRACKBAR_CLASS,
+                    TBS_AUTOTICKS | TBS_TOOLTIPS | WS_TABSTOP, 14, 258, 352, 15
+
+    LTEXT           "E&xtra volume for every voice (0 = silent, 50 = unchanged, 100 = double)",
+                    IDC_GVOLUME_LABEL, 14, 276, 352, 8
+    CONTROL         "", IDC_GVOLUME, TRACKBAR_CLASS,
+                    TBS_AUTOTICKS | TBS_TOOLTIPS | WS_TABSTOP, 14, 285, 352, 15
+
+    AUTOCHECKBOX    "Use these pause &lengths for every voice, not only the custom one",
+                    IDC_GLOBAL_PAUSES, 14, 303, 352, 10
+    AUTOCHECKBOX    "Speak p&unctuation by name",
+                    IDC_PUNCTUATION, 14, 314, 352, 10
+    AUTOCHECKBOX    "Obey AcuVoice control &tags written into the text, such as backslash s p d equals 250 backslash",
+                    IDC_TAGS, 14, 325, 352, 10
+    AUTOCHECKBOX    "Look words up in the custom user dictionar&y",
+                    IDC_USERDICT_ENABLE, 14, 336, 175, 10
+    AUTOCHECKBOX    "&Write a diagnostic log file", IDC_LOGGING, 192, 336, 174, 10
+
+    GROUPBOX        "Try it", -1, 7, 354, 366, 36
+
+    LTEXT           "Test se&ntence:", IDC_TESTTEXT_LABEL, 14, 364, 352, 8
+    EDITTEXT        IDC_TESTTEXT, 14, 373, 250, 13, ES_AUTOHSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Spea&k it", IDC_SPEAK, 270, 372, 96, 14
+
+    GROUPBOX        "About this engine", -1, 7, 394, 366, 42
+
+    EDITTEXT        IDC_INFO, 14, 404, 352, 28,
+                    ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP
+
+    DEFPUSHBUTTON   "&Save", IDC_SAVE, 7, 440, 56, 15
+    PUSHBUTTON      "Reset to engine &defaults", IDC_DEFAULTS, 69, 440, 106, 15
+    PUSHBUTTON      "Ed&it dictionary...", IDC_USERDICT, 181, 440, 82, 15
+    PUSHBUTTON      "&Browse logs", IDC_OPENLOG, 269, 440, 60, 15
+    PUSHBUTTON      "Close", IDCANCEL, 335, 440, 38, 15
+END

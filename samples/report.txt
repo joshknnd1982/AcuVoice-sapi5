@@ -1,0 +1,98 @@
+AcuVoice diagnostics, 32-bit build
+
+AcuVoice engine
+  install root      C:\Users\joshk\OneDrive\dev\sapivoice\
+  avcore.dll        C:\Users\joshk\OneDrive\dev\sapivoice\engine\Lib\avcore.dll
+  configuration     C:\Windows\acuvoice.ini
+  sound bank        C:\Program Files (x86)\AcuVoice\Ulaw08Sb\
+  dictionary        C:\Program Files (x86)\AcuVoice\Dictfls\
+  temp              C:\Program Files (x86)\AcuVoice\Temp\
+  user dictionary   C:\Program Files (x86)\AcuVoice\UserDict\  (custom entries off)
+  avcore version    3.02
+  engine output     8000 Hz 8-bit format 7 (mu-law)
+  output to SAPI    16000 Hz 16-bit mono
+  channels allowed  10000
+  pause lengths     650 / 500 / 350 / 7 ms
+
+Parameter ranges the engine's own tag parser enforces
+  speed   \spd=   85 .. 350   (default 175 words per minute)
+  pitch   \pit=   45 .. 91    (default 63)
+  volume  \vol=   0 .. 65535 (default 32767)
+  rel. speed \rspd= 50 .. 200   rel. pitch \Rpit= 70 .. 145
+
+Voices published to SAPI5
+  AcuVoice Roger               The engine's own voice, exactly as AcuVoice shipped it.
+  AcuVoice Roger Deep          Roger a fourth lower and a little slower.
+  AcuVoice Roger Bright        Roger a fourth higher, at his usual pace.
+  AcuVoice Roger Brisk         Roger at 260 words a minute, for reading rather than listening.
+  AcuVoice Roger Measured      Roger at 120 words a minute with longer pauses.
+  AcuVoice Roger Announcer     Roger slightly lower and louder, with broadcast pacing.
+  AcuVoice Roger Clipped       Roger fast and with the pauses taken out, for skimming.
+  AcuVoice Custom Voice        Every parameter comes from the AcuVoice configuration utility.
+
+AcuVoice voices in the machine's SAPI5 voice list
+  0 of the 647 voices installed on this machine are AcuVoice
+  (nothing installed machine-wide yet, so the SAPI test below falls back to the per-user tokens reg_test writes)
+
+Engine samples in C:\Users\joshk\OneDrive\dev\sapivoice\samples\engine
+  engine_01_default.wav                     5.83 s
+  engine_02_speed_085_wpm.wav              19.82 s
+  engine_02_speed_120_wpm.wav              16.39 s
+  engine_02_speed_175_wpm.wav              10.62 s
+  engine_02_speed_260_wpm.wav               7.80 s
+  engine_02_speed_350_wpm.wav               5.13 s
+  engine_03_pitch_45.wav                   11.50 s
+  engine_03_pitch_54.wav                   11.42 s
+  engine_03_pitch_63.wav                   11.46 s
+  engine_03_pitch_77.wav                   11.48 s
+  engine_03_pitch_91.wav                   11.20 s
+  engine_04_volume_06553.wav                9.62 s
+  engine_04_volume_16384.wav               10.81 s
+  engine_04_volume_32767.wav               11.13 s
+  engine_04_volume_49151.wav               10.72 s
+  engine_04_volume_65535.wav               11.21 s
+  engine_05_pauses_default.wav              6.22 s
+  engine_05_pauses_none.wav                 3.92 s
+  engine_05_pauses_long.wav                 9.32 s
+  engine_06_voice_1_roger.wav              10.08 s
+  engine_06_voice_2_deep.wav               10.65 s
+  engine_06_voice_3_bright.wav              9.58 s
+  engine_06_voice_4_brisk.wav               8.17 s
+  engine_06_voice_5_measured.wav           17.58 s
+  engine_06_voice_6_announcer.wav          12.39 s
+  engine_06_voice_7_clipped.wav             5.58 s
+  engine_07_numbers.wav                    15.84 s
+  engine_08_abbreviations.wav               7.42 s
+  engine_09_punctuation.wav                 9.24 s
+  engine_10_symbols.wav                     9.86 s
+  engine_11_accents.wav                     5.86 s
+  engine_12_long_paragraph.wav             25.62 s
+  engine_13_spelled.wav                     3.40 s
+  engine_14_punctuation_named.wav           6.59 s
+  engine_15_tags_bookmark.wav               5.25 s
+  engine_16_tags_literal.wav                8.54 s
+  engine_17_fast_and_low.wav                2.29 s
+  engine_18_slow_and_high.wav              36.03 s
+
+SAPI5 samples in C:\Users\joshk\OneDrive\dev\sapivoice\samples\engine
+  [per-user ]  sapi_AcuVoice_Roger.wav                        14.28 s
+  [per-user ]  sapi_host_rate_minus10.wav                     21.95 s
+  [per-user ]  sapi_host_rate_plus10.wav                       1.38 s
+  [per-user ]  sapi_host_volume_25.wav                         6.19 s
+  [per-user ]  sapi_host_volume_100.wav                        6.07 s
+  [per-user ]  sapi_AcuVoice_Roger_Deep.wav                   17.35 s
+  [per-user ]  sapi_AcuVoice_Roger_Bright.wav                 14.43 s
+  [per-user ]  sapi_AcuVoice_Roger_Brisk.wav                  10.64 s
+  [per-user ]  sapi_AcuVoice_Roger_Measured.wav               25.03 s
+  [per-user ]  sapi_AcuVoice_Roger_Announcer.wav              16.99 s
+  [per-user ]  sapi_AcuVoice_Roger_Clipped.wav                 8.37 s
+  [per-user ]  sapi_AcuVoice_Custom_Voice.wav                 14.69 s
+  8 AcuVoice voices spoken through SAPI5, 0 failed
+
+Latency (a screen reader's keystroke is the short one)
+  short utterance    2.56 ms  for   3.22 s of audio
+  short utterance    2.50 ms  for   3.22 s of audio
+  short utterance    2.52 ms  for   3.22 s of audio
+  long  utterance   12.45 ms  for  13.99 s of audio
+  long, with rate, pitch and volume applied   23.25 ms
+

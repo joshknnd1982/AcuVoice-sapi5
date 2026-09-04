@@ -1,0 +1,41 @@
+AcuVoice SAPI5 wrapper
+======================
+
+Copyright (c) 2026 the AcuVoice SAPI5 project contributors.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this
+software and associated documentation files (the "Software"), to deal in the Software
+without restriction, including without limitation the rights to use, copy, modify,
+merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be included in all copies
+or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+The AcuVoice speech engine
+--------------------------
+
+This licence covers the SAPI5 wrapper, the configuration utility, the worker process,
+the diagnostics tool and the build files in this repository -- the code written for this
+project.
+
+It does NOT cover the AcuVoice speech engine itself: avcore.dll, the recorded sound bank
+in Ulaw08Sb, the dictionary files in Dictfls, and the user dictionary editor. Those are
+(c) 1998-1999 AcuVoice, Inc., which was acquired by Fonix Corporation in 1998. Fonix's
+speech business was wound down in the late 2000s and the product has not been sold, sold
+on, or supported since. It is abandonware. No claim of ownership over it is made here,
+no licence to it is granted here, and it is not in this repository's source tree for
+that reason -- it ships only in the release installer, for the benefit of people who
+already have a copy of a product nobody sells any more.
+
+If you hold the rights to the AcuVoice engine and want the binaries taken down, open an
+issue on the repository and they will be removed.

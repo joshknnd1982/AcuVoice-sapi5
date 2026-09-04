@@ -1,0 +1,26 @@
+; AcuVoice engine configuration.
+;
+; avcore.dll opens this file by bare name through GetPrivateProfileString, so Windows
+; resolves it against the Windows directory: this is the only place the engine will ever
+; look for its directories. The installer fills the values in below.
+;
+; PAUSE1..PAUSE4 are lengths of silence in milliseconds -- after a sentence, at a
+; semicolon or colon, at a comma, and between words. They are the only prosody the
+; engine core applies itself; rate, pitch and volume are applied by the SAPI5 wrapper.
+; set_pausation writes changes back here, which is why the installer gives this file an
+; ACL that lets the logged-on user write to it.
+
+[AcuVoiceAppDir]
+SNDBANK=
+TEMPDIR=
+DICTFLSDIR=
+USERDICTDIR=
+
+[AcuVoiceSettings]
+PAUSE1=650
+PAUSE2=500
+PAUSE3=350
+PAUSE4=7
+
+[AcuVoiceDictionary]
+CUSTOM=NO
