@@ -7,7 +7,7 @@ echo.
 set BUILD_DIR_X86=build_x86
 set BUILD_DIR_X64=build_x64
 set OUTPUT_DIR=output
-set VERSION=1.1.0
+set VERSION=1.1.1
 
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 if not exist "%VSWHERE%" set "VSWHERE=%ProgramFiles%\Microsoft Visual Studio\Installer\vswhere.exe"

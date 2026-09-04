@@ -11,6 +11,7 @@
 
 #include <windows.h>
 #include <process.h>
+#include <sddl.h>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -240,6 +241,78 @@ done:
     return 0;
 }
 
+// The pipe has to be reachable from a lower integrity level than this process is running
+// at, and by default it is not.
+//
+// A named pipe inherits the creator's integrity label. If anything ever starts this
+// worker elevated -- the installer running its self-test, a user launching the
+// configuration utility as administrator, a host started from an elevated shell -- the
+// pipe is labelled High, Windows' no-write-up rule denies every ordinary medium-integrity
+// SAPI host access to it, and the mutex below then tells those hosts that a worker is
+// already running so they never start one they could actually talk to. The result is
+// every 64-bit voice going silent until the elevated worker times out, with an
+// ERROR_ACCESS_DENIED that nothing reports.
+//
+// So the label is set explicitly to Low, which any caller can write to, and the DACL is
+// narrowed to compensate: SYSTEM and Administrators in full, and read/write for the user
+// this worker belongs to. Without the explicit DACL the descriptor would come out with a
+// null one, which is everyone.
+[[nodiscard]] std::wstring current_user_sid()
+{
+    HANDLE token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) {
+        return {};
+    }
+    DWORD needed = 0;
+    GetTokenInformation(token, TokenUser, nullptr, 0, &needed);
+    std::wstring result;
+    if (needed) {
+        std::vector<BYTE> buffer(needed);
+        if (GetTokenInformation(token, TokenUser, buffer.data(), needed, &needed)) {
+            LPWSTR text = nullptr;
+            if (ConvertSidToStringSidW(
+                    reinterpret_cast<TOKEN_USER*>(buffer.data())->User.Sid, &text)) {
+                result = text;
+                LocalFree(text);
+            }
+        }
+    }
+    CloseHandle(token);
+    return result;
+}
+
+PSECURITY_DESCRIPTOR g_pipe_sd = nullptr;
+
+SECURITY_ATTRIBUTES* pipe_security()
+{
+    static SECURITY_ATTRIBUTES sa = {};
+    static bool built = false;
+    if (built) {
+        return g_pipe_sd ? &sa : nullptr;
+    }
+    built = true;
+
+    const std::wstring sid = current_user_sid();
+    std::wstring sddl = L"D:(A;;GA;;;SY)(A;;GA;;;BA)";
+    // IU -- anyone logged on interactively -- only as a fallback for the case where this
+    // process cannot read its own token, which should not happen.
+    sddl += L"(A;;GRGW;;;" + (sid.empty() ? std::wstring(L"IU") : sid) + L")";
+    sddl += L"S:(ML;;NW;;;LW)";
+
+    if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            sddl.c_str(), SDDL_REVISION_1, &g_pipe_sd, nullptr)) {
+        DEBUG_LOG("worker: could not build the pipe security descriptor (%lu); falling "
+                  "back to the default, which a lower integrity level cannot open",
+                  GetLastError());
+        g_pipe_sd = nullptr;
+        return nullptr;
+    }
+    sa.nLength = sizeof(sa);
+    sa.lpSecurityDescriptor = g_pipe_sd;
+    sa.bInheritHandle = FALSE;
+    return &sa;
+}
+
 HANDLE create_pipe_instance()
 {
     return CreateNamedPipeW(
@@ -247,7 +320,7 @@ HANDLE create_pipe_instance()
         PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
         PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
         PIPE_UNLIMITED_INSTANCES,
-        64 * 1024, 64 * 1024, 0, nullptr);
+        64 * 1024, 64 * 1024, 0, pipe_security());
 }
 
 }  // namespace

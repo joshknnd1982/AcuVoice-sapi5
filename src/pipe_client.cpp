@@ -225,10 +225,24 @@ bool PipeClient::ensureConnected() {
             Sleep(300);
         } else if (error == ERROR_PIPE_BUSY) {
             WaitNamedPipeW(ACUVOICE_PIPE_NAME, 1000);
+        } else if (error == ERROR_ACCESS_DENIED) {
+            // A worker exists but will not let us in. That means it is running at a
+            // higher integrity level than this process -- something started it elevated
+            // -- and Windows' no-write-up rule denies its pipe to us. We cannot kill it
+            // from here and cannot start a second one, because it holds the mutex, so
+            // all that is left is to say so plainly: this used to fail with no message
+            // at all and every 64-bit voice simply went silent.
+            DEBUG_LOG("pipe: the worker refused the connection (access denied). It is "
+                      "running at a higher integrity level than this process, which "
+                      "Windows will not let us talk to. End AcuVoiceServer.exe from an "
+                      "elevated Task Manager, or reboot, and it will restart correctly.");
+            break;
         } else {
+            DEBUG_LOG("pipe: could not open %ls (error %lu)", ACUVOICE_PIPE_NAME, error);
             break;
         }
     }
+    DEBUG_LOG("pipe: gave up connecting to the worker");
     return false;
 }
 

@@ -22,7 +22,7 @@
 ; needs it: avcore.dll is a plain C API with no COM and no registry.
 
 #define AppName "AcuVoice SAPI5"
-#define AppVersion "1.1.0"
+#define AppVersion "1.1.1"
 #define AppPublisher "AcuVoice SAPI5 project"
 #define AppURL "https://github.com/joshknnd1982/AcuVoice-sapi5"
 #define SrcRoot "..\"
@@ -153,8 +153,19 @@ Filename: "{syswow64}\regsvr32.exe"; Parameters: "/s ""{app}\x86\AcuVoiceSAPI.dl
 ; rather than as a silent screen reader later. It speaks every registered voice into a
 ; wave file and writes its report to %LOCALAPPDATA%\AcuVoice SAPI5\install-check.txt.
 ; Run as the 64-bit build, which also proves the worker starts and answers.
+;
+; runasoriginaluser matters here. Setup is elevated, and anything it starts inherits
+; that: the self-test would launch AcuVoiceServer.exe at high integrity, whose named pipe
+; Windows then refuses to every ordinary medium-integrity SAPI host -- and since that
+; worker holds the machine-wide mutex, hosts would see one running and never start one
+; they could talk to. Every 64-bit voice went silent until it timed out. It also puts
+; install-check.txt in the logged-on user's profile rather than the administrator's,
+; which is where anyone would look for it.
 Filename: "{app}\AcuVoiceDiagnostics.exe"; Parameters: "selftest"; \
-    StatusMsg: "Checking that every voice speaks..."; Flags: runhidden waituntilterminated
+    StatusMsg: "Checking that every voice speaks..."; Flags: runhidden waituntilterminated runasoriginaluser
+; And nothing setup started is left running, whatever integrity level it ended up at, so
+; the first real utterance always starts a worker that matches the host asking for it.
+Filename: "{sys}\taskkill.exe"; Parameters: "/f /im AcuVoiceServer.exe"; Flags: runhidden waituntilterminated skipifdoesntexist
 Filename: "{app}\AcuVoiceDiagnostics.exe"; Parameters: "say ""AcuVoice is installed and ready."""; \
     Description: "Say a test sentence out loud"; Flags: postinstall nowait skipifsilent
 Filename: "{app}\AcuVoiceConfig.exe"; Description: "Open the AcuVoice configuration utility"; Flags: postinstall nowait skipifsilent unchecked
@@ -255,10 +266,45 @@ begin
   begin
     // A machine that already has the 1999 AcuVoice product installed has its own
     // acuvoice.ini pointing at that install. Ours replaces it, so the original is kept
-    // beside it and can be put back by hand.
+    // and put back by the uninstaller.
     Ini := ExpandConstant('{win}\' + IniFile);
     Backup := ExpandConstant('{win}\acuvoice.ini.before-AcuVoiceSAPI5');
     if FileExists(Ini) and (not FileExists(Backup)) then
       FileCopy(Ini, Backup, True);
   end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  Ini, Backup, Default: String;
+begin
+  if CurUninstallStep <> usPostUninstall then
+    Exit;
+
+  // The default-voice setting, if it is still ours. regsvr32 /u has just deleted the
+  // token it names, so leaving the value behind would point Windows at a voice that no
+  // longer exists. Removing it lets SAPI fall back to whatever else is installed --
+  // and it is only removed when it is still ours, so a default the user changed to
+  // another engine's voice in the meantime is left alone.
+  if RegQueryStringValue(HKLM64, 'SOFTWARE\Microsoft\Speech\Voices', 'DefaultTokenId', Default) then
+    if Pos('AcuVoice_', Default) > 0 then
+      RegDeleteValue(HKLM64, 'SOFTWARE\Microsoft\Speech\Voices', 'DefaultTokenId');
+  if RegQueryStringValue(HKLM32, 'SOFTWARE\Microsoft\Speech\Voices', 'DefaultTokenId', Default) then
+    if Pos('AcuVoice_', Default) > 0 then
+      RegDeleteValue(HKLM32, 'SOFTWARE\Microsoft\Speech\Voices', 'DefaultTokenId');
+
+  // acuvoice.ini. Ours points at directories that have just been deleted, so it cannot
+  // stay as it is. If this machine had a copy of the 1999 product when we installed,
+  // its ini was saved at install time and goes back now -- otherwise that product would
+  // be left reading our dead paths and would stop working, which is a worse thing to
+  // leave behind than a stray file.
+  Ini := ExpandConstant('{win}\' + IniFile);
+  Backup := ExpandConstant('{win}\acuvoice.ini.before-AcuVoiceSAPI5');
+  if FileExists(Backup) then
+  begin
+    if FileCopy(Backup, Ini, False) then
+      DeleteFile(Backup);
+  end
+  else
+    DeleteFile(Ini);
 end;

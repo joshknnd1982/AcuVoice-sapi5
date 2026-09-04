@@ -250,6 +250,28 @@ and the 64-bit worker sends 8 KB at a time and checks for a stop between chunks 
 non-blocking peek rather than a read, because a blocking read on a synchronous pipe
 handle deadlocks against its own writer.
 
+### If the 64-bit voices go silent
+
+The worker's named pipe is created with an explicit **low integrity label**, and that is
+load-bearing. A named pipe otherwise inherits the integrity level of whatever created it.
+If anything ever starts the worker elevated -- an installer running a self-test, someone
+launching the configuration utility as administrator, a host started from an elevated
+shell -- the pipe is labelled High, Windows' no-write-up rule denies it to every ordinary
+medium-integrity SAPI host, and because that worker holds the machine-wide mutex those
+hosts see one already running and never start one they could talk to. Every 64-bit voice
+goes silent with an `ERROR_ACCESS_DENIED` that nothing reports; the 32-bit ones carry on
+working, because they load the engine in process and no pipe is involved.
+
+That was the bug in 1.1.0, and it is fixed three ways: the pipe is labelled Low so any
+caller can reach it, setup runs its self-test as the logged-on user rather than as the
+elevated installer, and setup ends any worker it started. If it ever happens anyway, the
+log now names it exactly rather than saying nothing, and ending `AcuVoiceServer.exe` from
+an elevated Task Manager clears it.
+
+Worth knowing: setting the UAC slider to **"Never notify"** does not turn UAC off. Token
+splitting still happens, programs still start at medium integrity, and installers still
+elevate -- silently, with nothing on screen to tell you something is now running High.
+
 ### Logging
 
 Both the installer and the engine write logs.

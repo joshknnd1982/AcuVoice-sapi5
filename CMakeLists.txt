@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(AcuVoiceSAPI VERSION 1.1.0 LANGUAGES C CXX)
+project(AcuVoiceSAPI VERSION 1.1.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -114,7 +114,10 @@ else()
     add_executable(AcuVoiceServer src/av_server.cpp)
     target_include_directories(AcuVoiceServer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_compile_definitions(AcuVoiceServer PRIVATE ${COMMON_DEFS})
-    target_link_libraries(AcuVoiceServer PRIVATE av_engine av_dsp shlwapi)
+    # advapi32 explicitly: the pipe's security descriptor is built with
+    # ConvertStringSecurityDescriptorToSecurityDescriptor, and relying on another
+    # import library to drag it in is fragile.
+    target_link_libraries(AcuVoiceServer PRIVATE av_engine av_dsp shlwapi advapi32)
     set_target_properties(AcuVoiceServer PROPERTIES WIN32_EXECUTABLE FALSE)
 
     list(APPEND ARCH_TARGETS AcuVoiceServer)
