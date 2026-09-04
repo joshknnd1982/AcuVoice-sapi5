@@ -54,7 +54,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "Put a shortcut to the AcuVoice configuration utility on the desktop"; GroupDescription: "Shortcuts:"
-Name: "samples"; Description: "Install the sample wave files that show what each voice and each setting sounds like"; GroupDescription: "Extras:"; Flags: unchecked
+Name: "setdefault"; Description: "Make AcuVoice Roger the default Windows speech voice"; GroupDescription: "Voices:"; Flags: unchecked
+Name: "samples"; Description: "Install the sample wave files that show what each voice and each setting sounds like"; GroupDescription: "Extras:"
 
 [Files]
 ; --- the SAPI5 engine and its tools ---
@@ -110,6 +111,11 @@ Root: HKLM32; Subkey: "SOFTWARE\AcuVoice SAPI5"; ValueType: string; ValueName: "
 ; The diagnostic log is on by default so a first-run problem leaves a trail. The
 ; configuration utility turns it off.
 Root: HKCU;   Subkey: "Software\AcuVoice SAPI5"; ValueType: dword;  ValueName: "Logging"; ValueData: 1; Flags: createvalueifdoesntexist
+; Both registry views, because a 32-bit and a 64-bit host read their own.
+Root: HKLM32; Subkey: "SOFTWARE\Microsoft\Speech\Voices"; ValueType: string; ValueName: "DefaultTokenId"; \
+    ValueData: "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\AcuVoice_roger"; Tasks: setdefault
+Root: HKLM64; Subkey: "SOFTWARE\Microsoft\Speech\Voices"; ValueType: string; ValueName: "DefaultTokenId"; \
+    ValueData: "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\AcuVoice_roger"; Tasks: setdefault; Check: Is64BitInstallMode
 
 [Icons]
 Name: "{group}\AcuVoice Speech Configuration"; Filename: "{app}\AcuVoiceConfig.exe"; Comment: "Adjust the AcuVoice speech rate, pitch, volume and pauses"
@@ -125,6 +131,13 @@ Name: "{autodesktop}\AcuVoice Speech Configuration"; Filename: "{app}\AcuVoiceCo
 ; the WOW6432Node view where 32-bit SAPI looks, and the 64-bit one in the native view.
 Filename: "{syswow64}\regsvr32.exe"; Parameters: "/s ""{app}\AcuVoiceSAPI.dll"""; StatusMsg: "Registering the 32-bit AcuVoice voices..."; Flags: runhidden waituntilterminated
 Filename: "{sys}\regsvr32.exe";      Parameters: "/s ""{app}\x64\AcuVoiceSAPI.dll"""; StatusMsg: "Registering the 64-bit AcuVoice voices..."; Flags: runhidden waituntilterminated; Check: Is64BitInstallMode
+; A self-test that runs while setup is still on screen, so a broken install says so here
+; rather than as a silent screen reader later. It speaks every registered voice into a
+; wave file and writes its report to %LOCALAPPDATA%\AcuVoice SAPI5\install-check.txt.
+Filename: "{app}\AcuVoiceDiagnostics.exe"; Parameters: "selftest"; \
+    StatusMsg: "Checking that every voice speaks..."; Flags: runhidden waituntilterminated
+Filename: "{app}\AcuVoiceDiagnostics.exe"; Parameters: "say ""AcuVoice is installed and ready."""; \
+    Description: "Say a test sentence out loud"; Flags: postinstall nowait skipifsilent
 Filename: "{app}\AcuVoiceConfig.exe"; Description: "Open the AcuVoice configuration utility"; Flags: postinstall nowait skipifsilent unchecked
 Filename: "{app}\README.md"; Description: "Read what AcuVoice is and what it can do"; Flags: postinstall shellexec nowait skipifsilent unchecked
 

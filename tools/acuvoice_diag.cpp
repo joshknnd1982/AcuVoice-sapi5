@@ -486,40 +486,62 @@ ISpObjectToken* open_token_by_path(const std::wstring& id)
     return token;
 }
 
-ISpObjectToken* find_installed_token(const std::wstring& name)
+// Every AcuVoice token the machine has, collected in one pass. A machine with several
+// speech engines on it can have several hundred voices, and enumerating the lot once per
+// voice we are looking for turns a two-second check into a minute of setup sitting still.
+std::vector<std::pair<std::wstring, ISpObjectToken*>> g_installed;
+bool g_installed_scanned = false;
+
+void scan_installed_tokens()
 {
+    if (g_installed_scanned) {
+        return;
+    }
+    g_installed_scanned = true;
+
     ISpObjectTokenCategory* cat = nullptr;
-    ISpObjectToken* found = nullptr;
     if (FAILED(CoCreateInstance(CLSID_SpObjectTokenCategory, nullptr, CLSCTX_ALL,
                                 IID_ISpObjectTokenCategory, (void**)&cat)) || !cat) {
-        return nullptr;
+        return;
     }
     IEnumSpObjectTokens* en = nullptr;
     if (SUCCEEDED(cat->SetId(SPCAT_VOICES, FALSE)) &&
         SUCCEEDED(cat->EnumTokens(nullptr, nullptr, &en)) && en) {
         ULONG count = 0;
         en->GetCount(&count);
-        for (ULONG i = 0; i < count && !found; ++i) {
+        for (ULONG i = 0; i < count; ++i) {
             ISpObjectToken* tok = nullptr;
             if (FAILED(en->Item(i, &tok)) || !tok) {
                 continue;
             }
             LPWSTR desc = nullptr;
+            bool kept = false;
             if (SUCCEEDED(tok->GetStringValue(nullptr, &desc)) && desc) {
-                if (name == desc) {
-                    found = tok;
-                    tok = nullptr;
+                if (wcsstr(desc, L"AcuVoice") != nullptr) {
+                    g_installed.emplace_back(desc, tok);
+                    kept = true;
                 }
                 CoTaskMemFree(desc);
             }
-            if (tok) {
+            if (!kept) {
                 tok->Release();
             }
         }
         en->Release();
     }
     cat->Release();
-    return found;
+}
+
+ISpObjectToken* find_installed_token(const std::wstring& name)
+{
+    scan_installed_tokens();
+    for (const auto& entry : g_installed) {
+        if (entry.first == name) {
+            entry.second->AddRef();
+            return entry.second;
+        }
+    }
+    return nullptr;
 }
 
 int write_sapi_samples()
@@ -647,9 +669,10 @@ void say(const std::wstring& text)
         wprintf(L"nothing to play\n");
         return;
     }
-    const std::wstring path = g_outdir + L"\\_say.wav";
-    write_wav(L"_say.wav", pcm, AcuVoice::OUTPUT_SAMPLE_RATE);
+    const std::wstring path = g_outdir + L"\\acuvoice_say.wav";
+    write_wav(L"acuvoice_say.wav", pcm, AcuVoice::OUTPUT_SAMPLE_RATE);
     PlaySoundW(path.c_str(), nullptr, SND_FILENAME | SND_SYNC);
+    DeleteFileW(path.c_str());
 }
 
 }  // namespace
@@ -660,7 +683,32 @@ int wmain(int argc, wchar_t** argv)
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
     const std::wstring mode = (argc > 1) ? argv[1] : L"report";
-    if (argc > 2) {
+
+    // The installer runs "selftest" while its progress bar is still on screen, so a
+    // broken install is reported there and not, later, as a screen reader that has gone
+    // quiet. Everything it prints goes to a file beside the engine's own log, because
+    // there is no console to print to when setup runs it hidden.
+    if (mode == L"selftest") {
+        wchar_t base[MAX_PATH] = {};
+        if (GetEnvironmentVariableW(L"LOCALAPPDATA", base, MAX_PATH) == 0) {
+            GetTempPathW(MAX_PATH, base);
+        }
+        const std::wstring dir = std::wstring(base) + L"\\AcuVoice SAPI5";
+        ensure_dir(dir);
+        g_outdir = dir + L"\\install-check";
+        ensure_dir(g_outdir);
+        FILE* redirected = nullptr;
+        _wfreopen_s(&redirected, (dir + L"\\install-check.txt").c_str(), L"w", stdout);
+    } else if (mode == L"say") {
+        // argv[2] is the sentence, not a directory; the wave file goes somewhere
+        // writable and is deleted on the way out.
+        wchar_t temp[MAX_PATH] = {};
+        GetTempPathW(MAX_PATH, temp);
+        g_outdir = temp;
+        if (!g_outdir.empty() && g_outdir.back() == L'\\') {
+            g_outdir.pop_back();
+        }
+    } else if (argc > 2) {
         g_outdir = argv[2];
         ensure_dir(g_outdir);
     }
@@ -683,6 +731,16 @@ int wmain(int argc, wchar_t** argv)
         write_engine_samples();
         rc = write_sapi_samples();
         measure_latency();
+    } else if (mode == L"selftest") {
+        report_engine();
+        report_registered_voices();
+        rc = write_sapi_samples();
+        measure_latency();
+        wprintf(L"\n%s\n", rc == 0
+            ? L"RESULT: the AcuVoice engine loaded and every registered voice spoke."
+            : L"RESULT: something is wrong -- see above. The engine, the voice "
+              L"registration or the sound bank did not come up.");
+        fflush(stdout);
     } else {
         report_engine();
         report_registered_voices();
