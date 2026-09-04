@@ -28,39 +28,59 @@ PipeClient::PipeClient()
 {
     InitializeCriticalSection(&cs_);
 
-    // Written by the installer. The fallbacks below find the worker beside the dll or one
-    // level up from it, which covers every layout this ships in; this is here so that a
-    // host which copied the dll somewhere else still finds the engine.
-    HKEY hKey;
-    if (RegOpenKeyExW(
-            HKEY_LOCAL_MACHINE, L"SOFTWARE\\AcuVoice SAPI5",
-            0, KEY_READ | KEY_WOW64_32KEY, &hKey) == ERROR_SUCCESS) {
-        wchar_t path[MAX_PATH];
-        DWORD size = sizeof(path);
-        if (RegQueryValueExW(hKey, L"InstallLocation", nullptr, nullptr,
-                             reinterpret_cast<LPBYTE>(path), &size) == ERROR_SUCCESS) {
-            serverPath_ = path;
-            if (!serverPath_.empty() && serverPath_.back() != L'\\') {
-                serverPath_ += L'\\';
-            }
-            serverPath_ += L"AcuVoiceServer.exe";
+    // The worker is 32-bit, because avcore.dll is, so it lives in the x86 subfolder of a
+    // 64-bit install and beside the caller in a build tree. Every plausible place is
+    // tried rather than one: the install directory the installer recorded, then the
+    // directory this module is in and the two ways down and up from it.
+    std::vector<std::wstring> roots;
+
+    for (const REGSAM view : { KEY_WOW64_64KEY, KEY_WOW64_32KEY }) {
+        HKEY key = nullptr;
+        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\AcuVoice SAPI5",
+                          0, KEY_READ | view, &key) != ERROR_SUCCESS) {
+            continue;
         }
-        RegCloseKey(hKey);
+        wchar_t path[MAX_PATH] = {};
+        DWORD size = sizeof(path);
+        DWORD type = 0;
+        if (RegQueryValueExW(key, L"InstallLocation", nullptr, &type,
+                             reinterpret_cast<LPBYTE>(path), &size) == ERROR_SUCCESS &&
+            type == REG_SZ && path[0]) {
+            roots.emplace_back(path);
+        }
+        RegCloseKey(key);
     }
 
-    if (serverPath_.empty() || GetFileAttributesW(serverPath_.c_str()) == INVALID_FILE_ATTRIBUTES) {
-        wchar_t dllPath[MAX_PATH];
-        if (HMODULE hModule = GetCurrentModule()) {
-            GetModuleFileNameW(hModule, dllPath, MAX_PATH);
-            PathRemoveFileSpecW(dllPath);
+    wchar_t dllPath[MAX_PATH] = {};
+    if (HMODULE hModule = GetCurrentModule()) {
+        GetModuleFileNameW(hModule, dllPath, MAX_PATH);
+        PathRemoveFileSpecW(dllPath);
+        roots.emplace_back(dllPath);
+        PathRemoveFileSpecW(dllPath);
+        roots.emplace_back(dllPath);
+    }
 
-            serverPath_ = std::wstring(dllPath) + L"\\AcuVoiceServer.exe";
-
-            if (GetFileAttributesW(serverPath_.c_str()) == INVALID_FILE_ATTRIBUTES) {
-                PathRemoveFileSpecW(dllPath);
-                serverPath_ = std::wstring(dllPath) + L"\\AcuVoiceServer.exe";
+    for (const std::wstring& root : roots) {
+        std::wstring base = root;
+        if (!base.empty() && base.back() != L'\\') {
+            base += L'\\';
+        }
+        for (const wchar_t* leaf : { L"x86\\AcuVoiceServer.exe", L"AcuVoiceServer.exe" }) {
+            const std::wstring candidate = base + leaf;
+            if (GetFileAttributesW(candidate.c_str()) != INVALID_FILE_ATTRIBUTES) {
+                serverPath_ = candidate;
+                return;
             }
         }
+    }
+
+    // Nothing found. Keep the most likely path so the log names something useful.
+    if (!roots.empty()) {
+        serverPath_ = roots.front();
+        if (!serverPath_.empty() && serverPath_.back() != L'\\') {
+            serverPath_ += L'\\';
+        }
+        serverPath_ += L"x86\\AcuVoiceServer.exe";
     }
 }
 

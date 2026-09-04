@@ -24,6 +24,7 @@
 #include "av_engine.h"
 #include "av_dsp.h"
 #include "av_paths.hpp"
+#include "av_frontend.hpp"
 #include "settings.hpp"
 #include "text_prep.hpp"
 #include "voices.hpp"
@@ -46,7 +47,6 @@ HWND g_dialog = nullptr;
 // happened to hold.
 bool g_loading = true;
 
-engine g_engine;
 std::vector<char> g_test_wav;
 
 struct slider_spec {
@@ -281,10 +281,12 @@ void speak_test(HWND dlg)
         SetDlgItemTextW(dlg, IDC_TESTTEXT, text.c_str());
     }
 
-    if (!g_engine.loaded() && !g_engine.load(avcore_path())) {
+    if (!frontend::ready()) {
         MessageBoxW(dlg,
-                    L"The AcuVoice engine could not be loaded, so there is nothing to "
-                    L"listen to. The About box below says where it was looked for.",
+                    L"The AcuVoice engine did not answer, so there is nothing to listen "
+                    L"to. This utility is 64-bit and the engine is 32-bit, so it speaks "
+                    L"through AcuVoiceServer.exe in the x86 folder of the install; the "
+                    L"About box below says where the engine was looked for.",
                     L"AcuVoice Speech Configuration", MB_OK | MB_ICONERROR);
         return;
     }
@@ -299,27 +301,15 @@ void speak_test(HWND dlg)
     const bool tags = IsDlgButtonChecked(dlg, IDC_TAGS) == BST_CHECKED;
     const bool punct = IsDlgButtonChecked(dlg, IDC_PUNCTUATION) == BST_CHECKED;
 
+    int32_t pauses[PAUSE_COUNT];
     for (int i = 0; i < PAUSE_COUNT; ++i) {
-        g_engine.set_pause(i + 1,
-            percent_to_range(get_slider(dlg, IDC_PAUSE1 + i * 2), 0, PAUSE_MAX[i]));
+        pauses[i] = percent_to_range(get_slider(dlg, IDC_PAUSE1 + i * 2), 0, PAUSE_MAX[i]);
     }
 
     std::wstring prepared = text::normalize(text, tags);
     if (punct) {
         prepared = text::name_punctuation(prepared);
     }
-    const std::string bytes = text::to_engine_bytes(prepared);
-
-    std::vector<unsigned char> ulaw;
-    (void)g_engine.speak_all(bytes.c_str(), tags, ulaw);
-    if (ulaw.empty()) {
-        MessageBoxW(dlg, L"The engine found nothing to say in that sentence.",
-                    L"AcuVoice Speech Configuration", MB_OK | MB_ICONINFORMATION);
-        return;
-    }
-
-    std::vector<int16_t> pcm;
-    dsp::ulaw_to_pcm16(ulaw.data(), ulaw.size(), pcm);
 
     dsp::params p;
     p.duration = speed_to_duration(speed) / (grate / 100.0);
@@ -327,7 +317,12 @@ void speak_test(HWND dlg)
     p.gain = volume_to_gain(volume) * (gvol / 100.0);
 
     std::vector<int16_t> out;
-    dsp::render(pcm, p, out);
+    if (!frontend::render(text::to_engine_bytes(prepared), p, pauses, tags, out) ||
+        out.empty()) {
+        MessageBoxW(dlg, L"The engine found nothing to say in that sentence.",
+                    L"AcuVoice Speech Configuration", MB_OK | MB_ICONINFORMATION);
+        return;
+    }
 
     build_wav(out, OUTPUT_SAMPLE_RATE, g_test_wav);
     PlaySoundW(nullptr, nullptr, SND_PURGE);
@@ -338,21 +333,22 @@ void speak_test(HWND dlg)
 void fill_about(HWND dlg)
 {
     const ini_config cfg = read_ini();
+    const frontend::engine_facts facts = frontend::facts();
     std::wstring text;
 
-    if (!g_engine.loaded()) {
-        (void)g_engine.load(avcore_path());
-    }
-
     text += L"AcuVoice speech engine, version ";
-    {
-        const std::string v = g_engine.loaded() ? g_engine.version() : std::string("not loaded");
-        text += std::wstring(v.begin(), v.end());
-    }
+    text += std::wstring(facts.version.begin(), facts.version.end());
     text += L".  One recorded voice, Roger, in American English -- the only voice and the "
             L"only language this engine has.\r\n";
-    text += L"Engine output: 8000 Hz 8-bit mu-law; this wrapper hands SAPI 16000 Hz "
-            L"16-bit mono.\r\n";
+    text += L"Engine output: " + std::to_wstring(facts.engine_rate) + L" Hz " +
+            std::to_wstring(facts.bits) + L"-bit mu-law; this wrapper hands SAPI " +
+            std::to_wstring(facts.output_rate) + L" Hz 16-bit mono.\r\n";
+    // Worth saying out loud, because it is the reason a 64-bit install still has an x86
+    // folder in it and a second process running.
+    text += std::wstring(L"This utility is ") +
+            (sizeof(void*) == 8 ? L"64-bit" : L"32-bit") +
+            L". The engine is a 32-bit dll with no 64-bit build in existence, so a 64-bit "
+            L"program reaches it through AcuVoiceServer.exe in the x86 folder.\r\n";
     text += L"Engine files: " + avcore_path() + L"\r\n";
     text += L"Sound bank: " + cfg.sound_bank + L"\r\n";
     text += L"Dictionary: " + cfg.dict_dir + L"\r\n";
@@ -361,6 +357,10 @@ void fill_about(HWND dlg)
             L"volume 0 to 65535.\r\n";
     text += L"The engine core parses its own rate, pitch and volume tags but never acts "
             L"on them; this wrapper applies all three.";
+    if (!facts.available) {
+        text += L"\r\n\r\nThe engine did not answer. Nothing will speak until that is "
+                L"fixed; the log folder button below has the detail.";
+    }
 
     SetDlgItemTextW(dlg, IDC_INFO, text.c_str());
 }

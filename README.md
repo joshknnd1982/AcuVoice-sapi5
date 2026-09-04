@@ -2,8 +2,14 @@
 
 A SAPI 5 speech engine for **AcuVoice**, the 1990s concatenative text-to-speech system
 from AcuVoice, Inc. of San Jose, California. It gives the engine eight voices in the
-Windows voice list, 32-bit and 64-bit, with a configuration utility that exposes every
-parameter the engine actually has.
+Windows voice list, for 64-bit and 32-bit hosts alike, with a configuration utility that
+exposes every parameter the engine actually has.
+
+It is a **64-bit product**: the SAPI engine, the configuration utility and the diagnostics
+are native x64 and install to `C:\Program Files`. The engine itself cannot be — `avcore.dll`
+is a 1999 binary with no source and no 64-bit build in existence — so it lives in a 32-bit
+worker in an `x86` subfolder, and a 64-bit host reaches it over a named pipe for about
+2 ms an utterance. See [How it is put together](#how-it-is-put-together).
 
 The original product spoke to Windows through SAPI 4, an interface Windows has not
 shipped since XP. **Nothing here uses SAPI 4.** The 1999 SAPI 4 engine, `AcuEng.dll`, is
@@ -191,25 +197,36 @@ If the voice ever ends up unintelligible and you cannot read the screen to fix i
 
 ## How it is put together
 
+This is a **64-bit product with a 32-bit engine inside it**. Everything you run —
+the SAPI 5 engine a 64-bit host loads, the configuration utility, the diagnostics —
+is native x64, and it installs to `C:\Program Files`. Two files are 32-bit, and neither
+is 32-bit by choice:
+
 ```
+64-bit host (Narrator, NVDA x64, Balabolka x64), and the utility and diagnostics
+    AcuVoiceSAPI.dll (x64)  ──►  x86\AcuVoiceServer.exe  ──►  avcore.dll
+                                 over a named pipe
+
 32-bit host (NVDA, JAWS, Balabolka x86)
-    AcuVoiceSAPI.dll  ──►  avcore.dll                      in process
-
-64-bit host (Narrator, NVDA x64, Balabolka x64)
-    AcuVoiceSAPI.dll  ──►  AcuVoiceServer.exe (32-bit)  ──►  avcore.dll
-                           over a named pipe
+    x86\AcuVoiceSAPI.dll    ──►  avcore.dll                   in process
 ```
 
-`avcore.dll` is 32-bit and there is no 64-bit build of it, so a 64-bit host reaches it
-through a worker. The worker holds one copy of the engine, serves every 64-bit client,
-and stays running between utterances — starting it costs a process launch and a pipe
-connect, which is far too much to pay on a keystroke. Text preparation and the prosody
-arithmetic both happen on the SAPI side, so the worker only ever receives finished
-Windows-1252 bytes and three numbers, and hands back finished 16-bit PCM.
+**`avcore.dll` can never be 64-bit.** It is a 1999 binary, there is no source, and no
+64-bit build of it has ever existed — so one 32-bit process has to exist to hold it, and
+the product will need WOW64 for as long as it runs. That is the floor; everything above
+it is x64. `x86\AcuVoiceSAPI.dll` is there for a different reason: NVDA and JAWS are
+themselves 32-bit and load a speech engine in process, so they need a 32-bit dll to load.
+
+The worker holds one copy of the engine, serves every 64-bit client, and stays running
+between utterances — starting it costs a process launch and a pipe connect, which is far
+too much to pay on a keystroke. Text preparation and the prosody arithmetic both happen
+on the SAPI side, so the worker only ever receives finished Windows-1252 bytes and three
+numbers, and hands back finished 16-bit PCM. Going through the pipe costs nothing
+measurable: a keystroke-sized utterance takes 2–3 ms either way.
 
 The two paths produce the same audio. Of the twelve wave files the diagnostics tool
-writes through SAPI, nine are byte-identical between the 32-bit in-process path and the
-64-bit worker path; the other three differ in exactly one sample out of a quarter of a
+writes through SAPI, ten are byte-identical between the 32-bit in-process path and the
+64-bit worker path; the other two differ in exactly one sample out of a quarter of a
 million, where an x87 and an SSE2 rounding split a WSOLA similarity tie differently.
 
 ### Responsiveness
@@ -218,10 +235,13 @@ The engine is very fast — about **1 ms of work per second of speech**. Measure
 development machine:
 
 ```
-short utterance    2.1 ms   for  2.6 s of audio
-long  utterance    9.6 ms   for 14.0 s of audio
+short utterance    2.3 ms   for  3.2 s of audio
+long  utterance   10.3 ms   for 14.0 s of audio
 long, with rate, pitch and volume applied   24 ms
 ```
+
+Those are the 64-bit numbers, measured through the pipe to the worker. The 32-bit
+in-process path is within a millisecond of them.
 
 What that buys: a long fragment is split at sentence boundaries so the first audio starts
 before the whole thing has been synthesized; audio reaches SAPI in 4 KB pieces with the
@@ -247,12 +267,13 @@ Both the installer and the engine write logs.
 ## What gets installed
 
 ```
-C:\Program Files (x86)\AcuVoice SAPI5\
-    AcuVoiceSAPI.dll            32-bit SAPI5 engine
-    AcuVoiceServer.exe          32-bit worker for 64-bit hosts
-    AcuVoiceConfig.exe          configuration utility
-    AcuVoiceDiagnostics.exe     engine report, sample generator, self-test
-    x64\AcuVoiceSAPI.dll        64-bit SAPI5 engine
+C:\Program Files\AcuVoice SAPI5\
+    AcuVoiceSAPI.dll            64-bit SAPI5 engine
+    AcuVoiceConfig.exe          64-bit configuration utility
+    AcuVoiceDiagnostics.exe     64-bit report, sample generator and self-test
+    x86\AcuVoiceServer.exe      the one 32-bit process that can hold the engine
+    x86\AcuVoiceSAPI.dll        32-bit SAPI5 engine, for NVDA, JAWS and other 32-bit hosts
+    x86\AcuVoiceDiagnostics.exe the same self-test through the 32-bit path
     engine\Lib\avcore.dll       the engine
     engine\Ulaw08Sb\            the 154 MB recorded sound bank
     engine\UserDict\            AcuVoice's own dictionary editor
@@ -297,7 +318,8 @@ whole set:
 ## Building
 
 Needs Visual Studio 2022 Build Tools (C++ x86 and x64), CMake 3.15+, and Inno Setup 6 for
-the installer.
+the installer. Both architectures are required even though the product is 64-bit: the x86
+toolset builds the worker that holds the engine.
 
 ```bat
 build_all.bat
@@ -325,9 +347,11 @@ back to that, which makes the whole SAPI path testable without elevation.
 | `src/ISpTTSEngineImpl.*` | the SAPI5 engine |
 | `src/av_server.cpp` | the 32-bit worker |
 | `src/pipe_*.{h,cpp}` | the wire protocol between them |
+| `src/av_frontend.hpp` | the one place that knows whether the engine is loaded in process or reached over the pipe |
 | `tools/acuvoice_config.*` | the configuration utility |
 | `tools/acuvoice_diag.cpp` | the report, the sample generator and the self-test |
 | `tools/av_probe.c`, `av_param.c`, `av_speed.c`, `av_pause.c` | the reverse-engineering probes this was built from, kept because they are the evidence for everything above |
+| `tools/a11y_dump.cpp` | walks a Win32 dialog with oleacc and reports any tab stop that is unnamed or unreachable |
 
 ---
 

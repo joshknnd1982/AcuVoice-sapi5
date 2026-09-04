@@ -24,15 +24,12 @@
 
 #include "av_dsp.h"
 #include "av_paths.hpp"
+#include "av_frontend.hpp"
 #include "text_prep.hpp"
 #include "settings.hpp"
 #include "voices.hpp"
 #include "voice_attributes.hpp"
 #include "pipe_client.h"
-
-#ifndef BUILD_X64
-#include "av_engine.h"
-#endif
 
 namespace {
 
@@ -72,69 +69,20 @@ bool write_wav(const std::wstring& name, const std::vector<int16_t>& pcm, int ra
 // The engine, reached the same way the matching SAPI build reaches it.
 // -------------------------------------------------------------------------------
 
-#ifdef BUILD_X64
-PipeClient g_pipe;
-
-struct collect { std::vector<int16_t>* out; };
-
-bool collect_cb(const char* data, uint32_t size, void* user)
-{
-    auto* c = static_cast<collect*>(user);
-    const size_t n = size / sizeof(int16_t);
-    const auto* s = reinterpret_cast<const int16_t*>(data);
-    c->out->insert(c->out->end(), s, s + n);
-    return true;
-}
-
+// Whether that goes straight into avcore or out to the 32-bit worker depends on which
+// architecture this was built for, and av_frontend.hpp is the only place that knows.
 bool engine_ready()
 {
-    EngineInfo info;
-    return g_pipe.engineInfo(info);
+    return AcuVoice::frontend::ready();
 }
 
 bool render(const std::string& text, const AcuVoice::dsp::params& p,
             const int32_t pause[4], bool tags, std::vector<int16_t>& out)
 {
-    out.clear();
-    collect c{ &out };
-    return g_pipe.speak(text.c_str(), static_cast<uint32_t>(text.size()),
-                        p.duration, p.pitch, p.gain, tags, pause, collect_cb, &c);
-}
-#else
-AcuVoice::engine g_engine;
-
-bool engine_ready()
-{
-    return g_engine.loaded() || g_engine.load(AcuVoice::avcore_path());
+    return AcuVoice::frontend::render(text, p, pause, tags, out);
 }
 
-bool render(const std::string& text, const AcuVoice::dsp::params& p,
-            const int32_t pause[4], bool tags, std::vector<int16_t>& out)
-{
-    out.clear();
-    if (!engine_ready()) {
-        return false;
-    }
-    for (int i = 0; i < AcuVoice::PAUSE_COUNT; ++i) {
-        if (pause && pause[i] >= 0) {
-            g_engine.set_pause(i + 1, pause[i]);
-        }
-    }
-    std::vector<unsigned char> ulaw;
-    if (!g_engine.speak_all(text.c_str(), tags, ulaw) && ulaw.empty()) {
-        return false;
-    }
-    std::vector<int16_t> pcm;
-    AcuVoice::dsp::ulaw_to_pcm16(ulaw.data(), ulaw.size(), pcm);
-    AcuVoice::dsp::render(pcm, p, out);
-    return true;
-}
-#endif
-
-const int32_t DEFAULT_PAUSES[4] = {
-    AcuVoice::PAUSE_DEFAULT[0], AcuVoice::PAUSE_DEFAULT[1],
-    AcuVoice::PAUSE_DEFAULT[2], AcuVoice::PAUSE_DEFAULT[3]
-};
+const int32_t* const DEFAULT_PAUSES = AcuVoice::frontend::DEFAULT_PAUSES;
 
 void sample(const wchar_t* name, const std::wstring& text,
             const AcuVoice::dsp::params& p = {},
@@ -167,31 +115,28 @@ void report_engine()
     wprintf(L"  user dictionary   %s  (custom entries %s)\n",
             cfg.user_dict_dir.c_str(), cfg.custom_dictionary ? L"on" : L"off");
 
-#ifdef BUILD_X64
-    EngineInfo info = {};
-    if (g_pipe.engineInfo(info)) {
-        wprintf(L"  worker reports    avcore %S, %u Hz %u-bit format %u, %u channels\n",
-                info.version, info.engine_rate, info.bits, info.format,
-                info.channels_allowed);
-        wprintf(L"  output to SAPI    %u Hz 16-bit mono\n", info.sample_rate);
-    } else {
-        wprintf(L"  !! AcuVoiceServer.exe did not answer\n");
-    }
-#else
-    if (engine_ready()) {
-        wprintf(L"  avcore version    %S\n", g_engine.version().c_str());
+    wprintf(L"  this tool is      %d-bit%s\n", static_cast<int>(sizeof(void*) * 8),
+            (sizeof(void*) == 8)
+                ? L", so it reaches the 32-bit engine through AcuVoiceServer.exe"
+                : L", so it loads avcore.dll in process");
+
+    const AcuVoice::frontend::engine_facts facts = AcuVoice::frontend::facts();
+    if (facts.available) {
+        wprintf(L"  avcore version    %S\n", facts.version.c_str());
         wprintf(L"  engine output     %d Hz %d-bit format %d (%s)\n",
-                g_engine.sample_rate(), g_engine.bits(), g_engine.format(),
-                g_engine.format() == 7 ? L"mu-law" : L"?");
-        wprintf(L"  output to SAPI    %d Hz 16-bit mono\n", AcuVoice::OUTPUT_SAMPLE_RATE);
-        wprintf(L"  channels allowed  %d\n", g_engine.channels_allowed());
-        wprintf(L"  pause lengths     %d / %d / %d / %d ms\n",
-                g_engine.get_pause(1), g_engine.get_pause(2),
-                g_engine.get_pause(3), g_engine.get_pause(4));
+                facts.engine_rate, facts.bits, facts.format,
+                facts.format == 7 ? L"mu-law" : L"?");
+        wprintf(L"  output to SAPI    %d Hz 16-bit mono\n", facts.output_rate);
+        wprintf(L"  channels allowed  %d\n", facts.channels_allowed);
+        if (sizeof(void*) == 4) {
+            wprintf(L"  pause lengths     %d / %d / %d / %d ms\n",
+                    facts.pause[0], facts.pause[1], facts.pause[2], facts.pause[3]);
+        }
     } else {
-        wprintf(L"  !! avcore.dll could not be loaded\n");
+        wprintf(L"  !! the engine did not answer -- %s\n",
+                (sizeof(void*) == 8) ? L"AcuVoiceServer.exe could not be started or reached"
+                                     : L"avcore.dll could not be loaded");
     }
-#endif
 
     wprintf(L"\nParameter ranges the engine's own tag parser enforces\n");
     wprintf(L"  speed   \\spd=   %d .. %d   (default %d words per minute)\n",

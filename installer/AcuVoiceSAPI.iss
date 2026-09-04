@@ -1,8 +1,14 @@
 ; AcuVoice SAPI5 -- Inno Setup script
 ;
-; What this installs:
-;   {app}                     the SAPI5 engine, the 32-bit worker, the configuration
-;                             utility and the diagnostics tool
+; This is a 64-bit product with a 32-bit engine inside it, and the layout says so:
+;
+;   {app}                     the 64-bit SAPI5 engine, the configuration utility and the
+;                             diagnostics -- everything the user runs
+;   {app}\x86                 the 32-bit worker that holds the engine, and the SAPI5 dll
+;                             that 32-bit hosts (NVDA, JAWS, 32-bit Balabolka) load in
+;                             process. Nothing here is 32-bit by choice: avcore.dll is a
+;                             1999 binary with no source and no 64-bit build, so one
+;                             32-bit process has to exist to hold it.
 ;   {app}\engine              avcore.dll and the 154 MB recorded sound bank
 ;   {commonappdata}\...       the dictionary and scratch directories, writable without
 ;                             elevation because the engine and the dictionary editor both
@@ -16,7 +22,7 @@
 ; needs it: avcore.dll is a plain C API with no COM and no registry.
 
 #define AppName "AcuVoice SAPI5"
-#define AppVersion "1.0.0"
+#define AppVersion "1.1.0"
 #define AppPublisher "AcuVoice SAPI5 project"
 #define AppURL "https://github.com/joshknnd1982/AcuVoice-sapi5"
 #define SrcRoot "..\"
@@ -31,7 +37,7 @@ AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}
 AppUpdatesURL={#AppURL}/releases
-DefaultDirName={commonpf32}\AcuVoice SAPI5
+DefaultDirName={commonpf64}\AcuVoice SAPI5
 DefaultGroupName=AcuVoice SAPI5
 DisableProgramGroupPage=yes
 LicenseFile={#SrcRoot}LICENSE.txt
@@ -41,7 +47,13 @@ Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
+; 64-bit only. The engine runs under WOW64 either way, and a product whose own binaries
+; are 64-bit has no business claiming to install on 32-bit Windows.
+ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
+; Version 1.0.0 installed to Program Files (x86). An upgrade must not inherit that
+; directory, or the 64-bit binaries would land back in the 32-bit folder.
+UsePreviousAppDir=no
 UninstallDisplayName={#AppName} {#AppVersion}
 UninstallDisplayIcon={app}\AcuVoiceConfig.exe
 ; Setup writes its own log next to the engine's, so a failed install and a silent voice
@@ -58,13 +70,15 @@ Name: "setdefault"; Description: "Make AcuVoice Roger the default Windows speech
 Name: "samples"; Description: "Install the sample wave files that show what each voice and each setting sounds like"; GroupDescription: "Extras:"
 
 [Files]
-; --- the SAPI5 engine and its tools ---
-Source: "{#OutRoot}AcuVoiceSAPI.dll";          DestDir: "{app}"; Flags: ignoreversion restartreplace uninsrestartdelete
-Source: "{#OutRoot}AcuVoiceServer.exe";        DestDir: "{app}"; Flags: ignoreversion restartreplace uninsrestartdelete
-Source: "{#OutRoot}AcuVoiceConfig.exe";        DestDir: "{app}"; Flags: ignoreversion
-Source: "{#OutRoot}AcuVoiceDiagnostics.exe";   DestDir: "{app}"; Flags: ignoreversion
-Source: "{#OutRoot}x64\AcuVoiceSAPI.dll";      DestDir: "{app}\x64"; Flags: ignoreversion restartreplace uninsrestartdelete; Check: Is64BitInstallMode
-Source: "{#OutRoot}x64\AcuVoiceDiagnostics.exe"; DestDir: "{app}\x64"; Flags: ignoreversion; Check: Is64BitInstallMode
+; --- 64-bit: the product ---
+Source: "{#OutRoot}AcuVoiceSAPI.dll";        DestDir: "{app}"; Flags: ignoreversion restartreplace uninsrestartdelete
+Source: "{#OutRoot}AcuVoiceConfig.exe";      DestDir: "{app}"; Flags: ignoreversion
+Source: "{#OutRoot}AcuVoiceDiagnostics.exe"; DestDir: "{app}"; Flags: ignoreversion
+
+; --- 32-bit: only what has to be ---
+Source: "{#OutRoot}x86\AcuVoiceServer.exe";      DestDir: "{app}\x86"; Flags: ignoreversion restartreplace uninsrestartdelete
+Source: "{#OutRoot}x86\AcuVoiceSAPI.dll";        DestDir: "{app}\x86"; Flags: ignoreversion restartreplace uninsrestartdelete
+Source: "{#OutRoot}x86\AcuVoiceDiagnostics.exe"; DestDir: "{app}\x86"; Flags: ignoreversion
 
 ; --- the engine itself ---
 Source: "{#SrcRoot}engine\Lib\avcore.dll";     DestDir: "{app}\engine\Lib"; Flags: ignoreversion
@@ -106,16 +120,19 @@ Filename: "{win}\acuvoice.ini"; Section: "AcuVoiceSettings"; Key: "PAUSE4"; Stri
 Filename: "{win}\acuvoice.ini"; Section: "AcuVoiceDictionary"; Key: "CUSTOM"; String: "NO"; Flags: createkeyifdoesntexist
 
 [Registry]
+; Both views: the 32-bit worker lookup reads the 32-bit view, the 64-bit engine the
+; native one, and either may be the first thing to ask.
+Root: HKLM64; Subkey: "SOFTWARE\AcuVoice SAPI5"; ValueType: string; ValueName: "InstallLocation"; ValueData: "{app}"; Flags: uninsdeletekey
+Root: HKLM64; Subkey: "SOFTWARE\AcuVoice SAPI5"; ValueType: string; ValueName: "Version"; ValueData: "{#AppVersion}"
 Root: HKLM32; Subkey: "SOFTWARE\AcuVoice SAPI5"; ValueType: string; ValueName: "InstallLocation"; ValueData: "{app}"; Flags: uninsdeletekey
 Root: HKLM32; Subkey: "SOFTWARE\AcuVoice SAPI5"; ValueType: string; ValueName: "Version"; ValueData: "{#AppVersion}"
 ; The diagnostic log is on by default so a first-run problem leaves a trail. The
 ; configuration utility turns it off.
 Root: HKCU;   Subkey: "Software\AcuVoice SAPI5"; ValueType: dword;  ValueName: "Logging"; ValueData: 1; Flags: createvalueifdoesntexist
-; Both registry views, because a 32-bit and a 64-bit host read their own.
 Root: HKLM32; Subkey: "SOFTWARE\Microsoft\Speech\Voices"; ValueType: string; ValueName: "DefaultTokenId"; \
     ValueData: "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\AcuVoice_roger"; Tasks: setdefault
 Root: HKLM64; Subkey: "SOFTWARE\Microsoft\Speech\Voices"; ValueType: string; ValueName: "DefaultTokenId"; \
-    ValueData: "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\AcuVoice_roger"; Tasks: setdefault; Check: Is64BitInstallMode
+    ValueData: "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\AcuVoice_roger"; Tasks: setdefault
 
 [Icons]
 Name: "{group}\AcuVoice Speech Configuration"; Filename: "{app}\AcuVoiceConfig.exe"; Comment: "Adjust the AcuVoice speech rate, pitch, volume and pauses"
@@ -126,14 +143,16 @@ Name: "{group}\Uninstall AcuVoice SAPI5";      Filename: "{uninstallexe}"
 Name: "{autodesktop}\AcuVoice Speech Configuration"; Filename: "{app}\AcuVoiceConfig.exe"; Tasks: desktopicon; Comment: "Adjust the AcuVoice speech rate, pitch, volume and pauses"
 
 [Run]
-; regsvr32 is called explicitly rather than through the regserver flag so that each
-; build registers through the loader of its own bitness: the 32-bit dll has to land in
-; the WOW6432Node view where 32-bit SAPI looks, and the 64-bit one in the native view.
-Filename: "{syswow64}\regsvr32.exe"; Parameters: "/s ""{app}\AcuVoiceSAPI.dll"""; StatusMsg: "Registering the 32-bit AcuVoice voices..."; Flags: runhidden waituntilterminated
-Filename: "{sys}\regsvr32.exe";      Parameters: "/s ""{app}\x64\AcuVoiceSAPI.dll"""; StatusMsg: "Registering the 64-bit AcuVoice voices..."; Flags: runhidden waituntilterminated; Check: Is64BitInstallMode
+; regsvr32 is called explicitly rather than through the regserver flag so that each build
+; registers through the loader of its own bitness: the 64-bit dll has to land in the
+; native registry view where 64-bit SAPI looks, and the 32-bit one in WOW6432Node where
+; 32-bit SAPI looks.
+Filename: "{sys}\regsvr32.exe";      Parameters: "/s ""{app}\AcuVoiceSAPI.dll"""; StatusMsg: "Registering the 64-bit AcuVoice voices..."; Flags: runhidden waituntilterminated
+Filename: "{syswow64}\regsvr32.exe"; Parameters: "/s ""{app}\x86\AcuVoiceSAPI.dll"""; StatusMsg: "Registering the 32-bit AcuVoice voices..."; Flags: runhidden waituntilterminated
 ; A self-test that runs while setup is still on screen, so a broken install says so here
 ; rather than as a silent screen reader later. It speaks every registered voice into a
 ; wave file and writes its report to %LOCALAPPDATA%\AcuVoice SAPI5\install-check.txt.
+; Run as the 64-bit build, which also proves the worker starts and answers.
 Filename: "{app}\AcuVoiceDiagnostics.exe"; Parameters: "selftest"; \
     StatusMsg: "Checking that every voice speaks..."; Flags: runhidden waituntilterminated
 Filename: "{app}\AcuVoiceDiagnostics.exe"; Parameters: "say ""AcuVoice is installed and ready."""; \
@@ -144,12 +163,13 @@ Filename: "{app}\README.md"; Description: "Read what AcuVoice is and what it can
 [UninstallRun]
 ; Unregister before anything is deleted, and ask the worker to exit so its copy of
 ; avcore.dll stops holding the install directory open.
-Filename: "{syswow64}\regsvr32.exe"; Parameters: "/s /u ""{app}\AcuVoiceSAPI.dll"""; Flags: runhidden waituntilterminated; RunOnceId: "UnregX86"
-Filename: "{sys}\regsvr32.exe";      Parameters: "/s /u ""{app}\x64\AcuVoiceSAPI.dll"""; Flags: runhidden waituntilterminated; Check: Is64BitInstallMode; RunOnceId: "UnregX64"
+Filename: "{sys}\regsvr32.exe";      Parameters: "/s /u ""{app}\AcuVoiceSAPI.dll"""; Flags: runhidden waituntilterminated; RunOnceId: "UnregX64"
+Filename: "{syswow64}\regsvr32.exe"; Parameters: "/s /u ""{app}\x86\AcuVoiceSAPI.dll"""; Flags: runhidden waituntilterminated; RunOnceId: "UnregX86"
 Filename: "{sys}\taskkill.exe"; Parameters: "/f /im AcuVoiceServer.exe"; Flags: runhidden waituntilterminated; RunOnceId: "StopWorker"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{commonappdata}\AcuVoice SAPI5\Temp"
+Type: filesandordirs; Name: "{app}\samples"
 
 [Code]
 const
@@ -166,6 +186,30 @@ begin
        SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
+function PreviousUninstaller(): String;
+var
+  Key: String;
+begin
+  Result := '';
+  Key := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\' +
+         '{7C4A1E92-3D58-4B0F-9E26-0A5F8C1D7B34}_is1';
+  if not RegQueryStringValue(HKLM64, Key, 'UninstallString', Result) then
+    if not RegQueryStringValue(HKLM32, Key, 'UninstallString', Result) then
+      Result := '';
+  Result := RemoveQuotes(Result);
+end;
+
+function PreviousInstallDir(): String;
+var
+  Key: String;
+begin
+  Result := '';
+  Key := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\' +
+         '{7C4A1E92-3D58-4B0F-9E26-0A5F8C1D7B34}_is1';
+  if not RegQueryStringValue(HKLM64, Key, 'InstallLocation', Result) then
+    RegQueryStringValue(HKLM32, Key, 'InstallLocation', Result);
+end;
+
 function InitializeSetup(): Boolean;
 begin
   StopWorker;
@@ -176,6 +220,31 @@ function InitializeUninstall(): Boolean;
 begin
   StopWorker;
   Result := True;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Uninstaller, PreviousDir, WantedDir: String;
+  ResultCode: Integer;
+begin
+  Result := '';
+
+  // Version 1.0.0 put everything in Program Files (x86), because the whole product was
+  // 32-bit then. This one is 64-bit and installs to Program Files, so an upgrade has to
+  // take the old copy out first -- otherwise its voice tokens keep pointing at binaries
+  // in a directory nothing writes to any more.
+  PreviousDir := PreviousInstallDir();
+  WantedDir := ExpandConstant('{app}');
+  if (PreviousDir <> '') and (CompareText(PreviousDir, WantedDir) <> 0) then
+  begin
+    Uninstaller := PreviousUninstaller();
+    if (Uninstaller <> '') and FileExists(Uninstaller) then
+    begin
+      Exec(Uninstaller, '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '',
+           SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      StopWorker;
+    end;
+  end;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);

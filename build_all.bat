@@ -7,6 +7,7 @@ echo.
 set BUILD_DIR_X86=build_x86
 set BUILD_DIR_X64=build_x64
 set OUTPUT_DIR=output
+set VERSION=1.1.0
 
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 if not exist "%VSWHERE%" set "VSWHERE=%ProgramFiles%\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -26,26 +27,31 @@ echo.
 rem A worker left running by an earlier test keeps avcore.dll -- and output\ -- open.
 taskkill /F /IM AcuVoiceServer.exe >nul 2>&1
 
-echo === Building x86 ===
-cmake -A Win32 -S . -B %BUILD_DIR_X86% || exit /b 1
-cmake --build %BUILD_DIR_X86% --config Release || exit /b 1
-echo.
-
-echo === Building x64 ===
+echo === Building x64 (the product) ===
 cmake -A x64 -S . -B %BUILD_DIR_X64% || exit /b 1
 cmake --build %BUILD_DIR_X64% --config Release || exit /b 1
 echo.
 
-echo === Staging %OUTPUT_DIR% ===
-if not exist %OUTPUT_DIR% mkdir %OUTPUT_DIR%
-if not exist %OUTPUT_DIR%\x64 mkdir %OUTPUT_DIR%\x64
+echo === Building x86 (the engine worker and the dll 32-bit hosts load) ===
+cmake -A Win32 -S . -B %BUILD_DIR_X86% || exit /b 1
+cmake --build %BUILD_DIR_X86% --config Release || exit /b 1
+echo.
 
-copy /Y "%BUILD_DIR_X86%\bin\Release\AcuVoiceSAPI.dll"        "%OUTPUT_DIR%\"    >nul || exit /b 1
-copy /Y "%BUILD_DIR_X86%\bin\Release\AcuVoiceServer.exe"      "%OUTPUT_DIR%\"    >nul || exit /b 1
-copy /Y "%BUILD_DIR_X86%\bin\Release\AcuVoiceConfig.exe"      "%OUTPUT_DIR%\"    >nul || exit /b 1
-copy /Y "%BUILD_DIR_X86%\bin\Release\AcuVoiceDiagnostics.exe" "%OUTPUT_DIR%\"    >nul || exit /b 1
-copy /Y "%BUILD_DIR_X64%\bin\Release\AcuVoiceSAPI.dll"        "%OUTPUT_DIR%\x64\" >nul || exit /b 1
-copy /Y "%BUILD_DIR_X64%\bin\Release\AcuVoiceDiagnostics.exe" "%OUTPUT_DIR%\x64\" >nul || exit /b 1
+echo === Staging %OUTPUT_DIR% ===
+if exist %OUTPUT_DIR%\x64 rmdir /s /q %OUTPUT_DIR%\x64
+if not exist %OUTPUT_DIR% mkdir %OUTPUT_DIR%
+if not exist %OUTPUT_DIR%\x86 mkdir %OUTPUT_DIR%\x86
+
+rem 64-bit at the root: this is what the user runs and what a 64-bit host loads.
+copy /Y "%BUILD_DIR_X64%\bin\Release\AcuVoiceSAPI.dll"        "%OUTPUT_DIR%\"     >nul || exit /b 1
+copy /Y "%BUILD_DIR_X64%\bin\Release\AcuVoiceConfig.exe"      "%OUTPUT_DIR%\"     >nul || exit /b 1
+copy /Y "%BUILD_DIR_X64%\bin\Release\AcuVoiceDiagnostics.exe" "%OUTPUT_DIR%\"     >nul || exit /b 1
+
+rem 32-bit in x86\: only what has to be. AcuVoiceServer.exe is the one process that can
+rem hold avcore.dll; the dll beside it is for hosts that are themselves 32-bit.
+copy /Y "%BUILD_DIR_X86%\bin\Release\AcuVoiceServer.exe"      "%OUTPUT_DIR%\x86\" >nul || exit /b 1
+copy /Y "%BUILD_DIR_X86%\bin\Release\AcuVoiceSAPI.dll"        "%OUTPUT_DIR%\x86\" >nul || exit /b 1
+copy /Y "%BUILD_DIR_X86%\bin\Release\AcuVoiceDiagnostics.exe" "%OUTPUT_DIR%\x86\" >nul || exit /b 1
 echo.
 
 if not exist "engine\Lib\avcore.dll" (
@@ -76,5 +82,5 @@ echo.
 
 :done
 echo Build finished.
-if exist "%OUTPUT_DIR%\AcuVoiceSAPI5_Setup_1.0.0.exe" echo Installer: %OUTPUT_DIR%\AcuVoiceSAPI5_Setup_1.0.0.exe
+if exist "%OUTPUT_DIR%\AcuVoiceSAPI5_Setup_%VERSION%.exe" echo Installer: %OUTPUT_DIR%\AcuVoiceSAPI5_Setup_%VERSION%.exe
 endlocal

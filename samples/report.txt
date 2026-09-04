@@ -1,4 +1,4 @@
-AcuVoice diagnostics, 32-bit build
+AcuVoice diagnostics, 64-bit build
 
 AcuVoice engine
   install root      C:\Users\joshk\OneDrive\dev\sapivoice\
@@ -8,11 +8,11 @@ AcuVoice engine
   dictionary        C:\Program Files (x86)\AcuVoice\Dictfls\
   temp              C:\Program Files (x86)\AcuVoice\Temp\
   user dictionary   C:\Program Files (x86)\AcuVoice\UserDict\  (custom entries off)
+  this tool is      64-bit, so it reaches the 32-bit engine through AcuVoiceServer.exe
   avcore version    3.02
   engine output     8000 Hz 8-bit format 7 (mu-law)
   output to SAPI    16000 Hz 16-bit mono
   channels allowed  10000
-  pause lengths     650 / 500 / 350 / 7 ms
 
 Parameter ranges the engine's own tag parser enforces
   speed   \spd=   85 .. 350   (default 175 words per minute)
@@ -86,13 +86,13 @@ SAPI5 samples in C:\Users\joshk\OneDrive\dev\sapivoice\samples\engine
   [per-user ]  sapi_AcuVoice_Roger_Measured.wav               25.03 s
   [per-user ]  sapi_AcuVoice_Roger_Announcer.wav              16.99 s
   [per-user ]  sapi_AcuVoice_Roger_Clipped.wav                 8.37 s
-  [per-user ]  sapi_AcuVoice_Custom_Voice.wav                 14.69 s
+  [per-user ]  sapi_AcuVoice_Custom_Voice.wav                 14.73 s
   8 AcuVoice voices spoken through SAPI5, 0 failed
 
 Latency (a screen reader's keystroke is the short one)
-  short utterance    2.56 ms  for   3.22 s of audio
-  short utterance    2.50 ms  for   3.22 s of audio
-  short utterance    2.52 ms  for   3.22 s of audio
-  long  utterance   12.45 ms  for  13.99 s of audio
-  long, with rate, pitch and volume applied   23.25 ms
+  short utterance    2.32 ms  for   3.22 s of audio
+  short utterance    3.07 ms  for   3.22 s of audio
+  short utterance    2.14 ms  for   3.22 s of audio
+  long  utterance   10.29 ms  for  13.99 s of audio
+  long, with rate, pitch and volume applied   23.63 ms
 
