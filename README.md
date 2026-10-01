@@ -379,8 +379,9 @@ back to that, which makes the whole SAPI path testable without elevation.
 
 ## Licence
 
-The wrapper — everything in `src/`, `tools/`, `installer/` and the build files — is MIT.
-See [LICENSE.txt](LICENSE.txt).
+The wrapper — everything in `src/`, `tools/`, `installer/` and the build files — is MIT,
+except the SAPI 5 COM files in `src/` that were adapted from Gozaltech's BestSpeech
+wrapper (listed in [NOTICE.md](NOTICE.md)). See [LICENSE.txt](LICENSE.txt).
 
 The AcuVoice engine itself is not. `avcore.dll`, the sound bank, the dictionary and the
 dictionary editor are © 1998–1999 AcuVoice, Inc. / Fonix Corporation. The product has not
@@ -388,3 +389,4 @@ been sold or supported for well over a decade and is abandonware. It is not in t
 repository's source tree; it ships only in the release installer, for people who already
 have a copy of something nobody sells any more. If you hold the rights and want the
 binaries taken down, open an issue and they will be removed.
+See [NOTICE.md](NOTICE.md).
