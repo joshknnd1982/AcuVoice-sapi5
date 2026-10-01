@@ -21,17 +21,20 @@ already have a copy of a product nobody sells any more.
 If you hold the rights to the AcuVoice engine and want the binaries taken down, open an
 issue on the repository and they will be removed.
 
-## Not covered: the SAPI 5 COM skeleton from the BestSpeech SAPI 5 wrapper
+## Not covered: files adapted from the BestSpeech SAPI 5 wrapper
 
-The files below are an exception to the statement above that the licence covers the SAPI5
-wrapper. They were adapted from the SAPI 5 COM server and token enumerator skeleton of the
-BestSpeech SAPI 5 wrapper by Gozaltech (<https://github.com/gozaltech/BstSpeech-sapi>), they
-are not the work of this project's author, and the MIT License does not cover them. They stay
-under their original author's terms.
+The files below were adapted from the BestSpeech SAPI 5 wrapper by Gozaltech
+(<https://github.com/gozaltech/BstSpeech-sapi>) and still contain much of that project's
+code: its SAPI 5 COM server and token enumerator skeleton, and its named-pipe client. They
+are an exception to the statement above that the licence covers the SAPI5 wrapper. The MIT
+License does not cover them, and they stay under their original author's terms.
 
 - `src/com.hpp` and `src/com.cpp`
 - `src/registry.hpp` and `src/registry.cpp`
 - `src/utils.hpp`
+- `src/sapi_main.cpp`
 - `src/ISpDataKeyImpl.hpp` and `src/ISpDataKeyImpl.cpp`
 - `src/IEnumSpObjectTokensImpl.hpp` and `src/IEnumSpObjectTokensImpl.cpp`
+- `src/ISpTTSEngineImpl.hpp`
 - `src/voice_token.hpp` and `src/voice_token.cpp`
+- `src/pipe_client.h`, `src/pipe_client.cpp` and `src/pipe_protocol.h`
